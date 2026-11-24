@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>👟 ShoeHub - SIA</title>
+
+<style>
+  :root {
+    --bg: #0d151c;
+    --panel: #141f29;
+    --text: #e2ebf2;
+    --muted: #98aab8;
+    --accent: #6d28d9;
+    --accent-text: #a78bfa;
+    --accent-dark: #5b21b6;
+    --border: #243545;
+    --error-bg: #3b1019;
+    --error-text: #fda4af;
+    --bubble-user: #6d28d9;
+    --bubble-bot: #1b2936;
+    --warn-bg: #33260d;
+    --warn-text: #e8c778;
+    --info-bg: #1e1336;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+
+  main {
+    width: 100%;
+    max-width: 680px;
+  }
+
+  header {
+    margin-bottom: 24px;
+  }
+
+  h1 {
+    color: var(--accent-text);
+    font-size: 30px;
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  p.subtitle {
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+
+  .panel h2 {
+    font-size: 16px;
+    margin: 0 0 14px;
+    color: var(--accent-text);
+  }
+
+  #reset-banner {
+    display: none;
+    background: var(--warn-bg);
+    color: var(--warn-text);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+
+  #log {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 360px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+    padding-right: 4px;
+  }
+
+  .msg {
+    padding: 10px 12px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 90%;
+  }
+
+  .msg.user {
+    align-self: flex-end;
+    background: var(--bubble-user);
+    border: 1px solid #8b5cf6;
+    color: #fff;
+  }
+
+  .msg.bot {
+    align-self: flex-start;
+    background: var(--bubble-bot);
+    border: 1px solid var(--border);
+  }
+
+  .msg.error {
+    align-self: flex-start;
+    background: var(--error-bg);
+    color: var(--error-text);
+  }
+
+  #chat-form {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  #chat-form textarea {
+    flex: 1;
+    min-width: 0;
+    min-height: 50px;
+    resize: vertical;
+  }
+
+  textarea {
+    width: 100%;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  textarea::placeholder {
+    color: var(--muted);
+    opacity: 0.7;
+  }
+
+  textarea:focus {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+  }
+
+  button.primary {
+    padding: 9px 18px;
+    border: 1px solid #8b5cf6;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    align-self: stretch;
+  }
+
+  button.primary:hover {
+    background: var(--accent-dark);
+  }
+
+  button.primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .chat-hint {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 10px 0 0;
+  }
+
+  .suggestion {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  .suggestion span {
+    background: var(--info-bg);
+    color: var(--accent-text);
+    border: 1px solid #4c1d95;
+    border-radius: 20px;
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+
+  .info-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+
+  .info-panel h2 {
+    font-size: 16px;
+    color: var(--accent-text);
+    margin: 0 0 9px;
+  }
+
+  .info-panel p {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+
+  .api-label {
+    display: inline-block;
+    background: var(--info-bg);
+    color: var(--accent-text);
+    border: 1px solid #4c1d95;
+    border-radius: 5px;
+    padding: 6px 9px;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .api-note {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  footer {
+    margin-top: 22px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  @media (max-width: 480px) {
+    body {
+      padding: 24px 12px;
+    }
+
+    h1 {
+      font-size: 26px;
+    }
+
+    .panel,
+    .info-panel {
+      padding: 14px;
+    }
+
+    #chat-form {
+      flex-direction: column;
+    }
+
+    button.primary {
+      min-height: 42px;
+    }
+  }
+</style>
+</head>
+
+<body>
+<main>
+
+  <header>
+    <h1><span>👟</span> ShoeHub - SIA</h1>
+    <p class="subtitle">
+      Il marketplace dedicato al mondo delle calzature.
+      <strong>SIA</strong> è l'assistente virtuale che ti aiuta
+      a esplorare il catalogo, confrontare i prodotti e trovare
+      le informazioni che cerchi. 
+      <br/> Per ottenere risultati più pertinenti, formula domande specifiche sui prodotti, 
+      sulle caratteristiche e sui prezzi disponibili. 
+      <br/> SIA genera risposte brevi. Le richieste troppo generiche potrebbero non restituire risultati.
+      <br/>Se desideri una risposta più dettagliata, tieni presente che potrebbe essere troncata...
+    </p>
+  </header>
+
+  <div id="reset-banner"></div>
+
+  <section class="panel">
+    <h2>Chiedi a SIA</h2>
+
+    <div id="log"></div>
+
+    <form id="chat-form">
+      <textarea
+        id="message"
+        placeholder="Fai una domanda sul catalogo..."
+        aria-label="Messaggio per SIA"
+      ></textarea>
+
+      <button class="primary" type="submit">
+        Invia
+      </button>
+    </form>
+
+    <p class="chat-hint">
+      Non sai da dove iniziare? Puoi sfruttare i seguenti suggerimenti:
+    </p>
+
+    <div class="suggestion">
+      <span>Scarpe da trekking disponibili</span>
+      <span>Confronta i prodotti</span>
+      <span>Scarpe da running</span>
+      <span>Scarpe Sneaker</span>
+    </div>
+  </section>
+
+  <section class="info-panel">
+    <h2>Vuoi contribuire al catalogo?</h2>
+
+    <p>
+      Anche tu puoi proporre un nuovo prodotto a ShoeHub.
+      Le schede inviate alla piattaforma vengono sottoposte
+      a un controllo automatico prima di essere valutate.
+    </p>
+
+    <div class="api-label">POST /submit-product</div>
+
+    <p class="api-note">
+      Per inviare una proposta sono necessari un titolo e una
+      descrizione del prodotto. Puoi utilizzare strumenti come
+      Postman, curl oppure uno script Python per effettuare
+      la richiesta.
+    </p>
+  </section>
+
+  <footer>
+    ShoeHub mette a disposizione API per interagire con la
+    piattaforma. Puoi consultare il catalogo tramite SIA oppure
+    proporre nuovi prodotti attraverso l'endpoint dedicato.
+    <br>
+    ShoeHub · Assistente virtuale SIA
+  </footer>
+
+</main>
+
+<script>
+const log = document.getElementById('log');
+const resetBanner = document.getElementById('reset-banner');
+
+// --- Gestione messaggi ---
+function addMessage(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+
+  return div;
+}
+
+// --- Chat ---
+const form = document.getElementById('chat-form');
+
+form.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+
+  const textarea = document.getElementById('message');
+  const message = textarea.value.trim();
+
+  if (!message) return;
+
+  addMessage(message, 'user');
+  textarea.value = '';
+
+  const sendBtn = form.querySelector('button');
+  sendBtn.disabled = true;
+
+  const pending = addMessage(
+    'SIA sta cercando nel catalogo...',
+    'bot'
+  );
+
+  try {
+    const resp = await fetch('/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: message
+      })
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      pending.className = 'msg error';
+      pending.textContent =
+        data.error || ('Richiesta fallita (' + resp.status + ').');
+      return;
+    }
+
+    pending.textContent = data.reply || '(nessuna risposta)';
+
+  } catch (e) {
+    pending.className = 'msg error';
+    pending.textContent = 'Errore di rete: ' + e.message;
+
+  } finally {
+    sendBtn.disabled = false;
+    textarea.focus();
+  }
+});
+
+// --- Avviso di reset imminente del catalogo ---
+async function checkResetBanner() {
+  try {
+    const resp = await fetch('/reset-info');
+
+    if (!resp.ok) return;
+
+    const data = await resp.json();
+    const remaining = data.next_reset_in_s;
+
+    if (remaining !== undefined && remaining <= 120) {
+      const minutes = Math.max(0, Math.round(remaining / 60));
+
+      resetBanner.textContent =
+        'Attenzione: i prodotti inviati finora verranno rimossi ' +
+        'dal catalogo tra circa ' +
+        (minutes <= 1 ? 'un minuto' : minutes + ' minuti') + '.';
+
+      resetBanner.style.display = 'block';
+
+    } else {
+      resetBanner.style.display = 'none';
+    }
+
+  } catch (e) {
+    // Nessun avviso se l'endpoint non risponde.
+  }
+}
+
+checkResetBanner();
+setInterval(checkResetBanner, 30000);
+</script>
+
+</body>
+</html>

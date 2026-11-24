@@ -1,0 +1,2 @@
+[09:12] Connessione instabile sulla rete del secondo piano.
+[09:14] Riavviato lo switch principale.

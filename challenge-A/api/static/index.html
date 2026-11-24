@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mind Reports</title>
+<style>
+  :root {
+    --bg: #f1f5f9; 
+    --panel: #fff; 
+    --sub: #f8fafc; 
+    --txt: #0f172a; 
+    --muted: #64748b;
+    --acc: #16425b; 
+    --acc-h: #0f2e40; 
+    --acc-s: rgba(22,66,91,.08); 
+    --brd: #e2e8f0;
+    --err-bg: #fef2f2; 
+    --err-t: #991b1b; 
+    --err-b: #fecaca;
+    --ok-bg: #f0fdf4; 
+    --ok-t: #166534; 
+    --ok-b: #bbf7d0;
+    --shd: 0 10px 25px -5px rgba(15,23,42,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #061124; 
+      --panel: #0c1d38; 
+      --sub: #081529; 
+      --txt: #f1f5f9; 
+      --muted: #8ea8c8;
+      --acc: #38bdf8; 
+      --acc-h: #0284c7; 
+      --acc-s: rgba(56,189,248,.12); 
+      --brd: #193258;
+      --err-bg: #2a1215; 
+      --err-t: #fca5a5; 
+      --err-b: #7f1d1d;
+      --ok-bg: #0f291e; 
+      --ok-t: #86efac; 
+      --ok-b: #14532d;
+      --shd: 0 20px 35px -10px rgba(0,0,0,.5);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 48px;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--txt);
+    display: flex; justify-content: center;
+  }
+  main { width: 100%; max-width: 680px; }
+
+  header { position: relative; padding: 44px 0 26px 88px; }
+  header::before {
+    content: ""; position: absolute; left: 0; top: 40px; width: 72px; height: 72px;
+    border-radius: 12px; border: 2px solid var(--acc);
+    background: url('brain.jpg') center/cover;
+    box-shadow: 0 0 18px rgba(56,189,248,.22);
+  }
+  header::after {
+    content: ""; position: absolute; top: -30px; right: -20px; width: 320px; height: 200px;
+    mask-image: radial-gradient(ellipse, #000 20%, transparent 72%);
+    pointer-events: none;
+  }
+  body:has(button:disabled) header::before { animation: pulse 1.8s infinite ease-in-out; }
+  @keyframes pulse { 50% { transform: scale(1.05); box-shadow: 0 0 24px rgba(56,189,248,.75); } }
+
+  h1 { margin: 0; font-size: 25px; letter-spacing: -.02em; }
+  p.subtitle { margin: 2px 0 0; color: var(--muted); }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--brd);
+    border-radius: 12px; padding: 24px; box-shadow: var(--shd);
+  }
+  label { display: block; font-weight: 600; margin-bottom: 10px; }
+  textarea {
+    width: 100%; min-height: 150px; padding: 12px 14px; font: inherit;
+    border: 1px solid var(--brd); border-radius: 8px;
+    background: var(--sub); color: var(--txt); resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-s); }
+
+  .actions { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  button {
+    padding: 10px 20px; border: 0; border-radius: 8px; background: var(--acc); color: #fff;
+    font: 600 14px inherit; cursor: pointer; transition: .15s;
+  }
+  @media (prefers-color-scheme: dark) { button { color: #090d14; } }
+  button:hover:not(:disabled) { background: var(--acc-h); transform: translateY(-1px); }
+  button:disabled { display: inline-flex; align-items: center; gap: 8px; opacity: .65; cursor: not-allowed; }
+  button:disabled::before {
+    content: ""; width: 13px; height: 13px; border: 2px solid currentColor;
+    border-right-color: transparent; border-radius: 50%; animation: spin .75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .actions span { font-size: 12px; color: var(--muted); }
+
+  #status { display: none; margin-top: 16px; padding: 11px 14px; font-size: 13.5px; border-radius: 8px; border: 1px solid var(--brd); background: var(--acc-s); }
+  #status:not(:empty) { display: block; }
+  #status.error { background: var(--err-bg); color: var(--err-t); border-color: var(--err-b); }
+  #status.ok { background: var(--ok-bg); color: var(--ok-t); border-color: var(--ok-b); }
+
+  footer { margin-top: 20px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Mind Reports</h1>
+    <p class="subtitle">Generatore interno di piccoli report/note aziendali.</p>
+  </header>
+
+  <div class="panel">
+    <label for="prompt">Cosa vuoi che contenga la nota?</label>
+    <textarea id="prompt" placeholder="Es: Scrivi una nota rapida sullo stato dei server del reparto IT."></textarea>
+    <div class="actions">
+      <button id="submit-btn"><b>Genera report (PDF)</b></button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <footer>
+    L'API e' raggiungibile anche direttamente: <code>POST /report</code> con corpo
+    <code>{"prompt": "..."}</code>, risposta in PDF.
+  </footer>
+</main>
+
+<script>
+const btn = document.getElementById('submit-btn');
+const promptEl = document.getElementById('prompt');
+const statusEl = document.getElementById('status');
+
+function setStatus(message, isError) {
+  statusEl.textContent = message;
+  statusEl.className = isError ? 'error' : 'ok';
+}
+
+btn.addEventListener('click', async () => {
+  const prompt = promptEl.value.trim();
+  if (!prompt) {
+    setStatus('Scrivi prima una richiesta.', true);
+    return;
+  }
+
+  btn.disabled = true;
+  const startTime = Date.now();
+  setStatus('Generazione in corso (0s)... ci vorranno pochi secondi', false);
+  const timer = setInterval(() => {
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    setStatus('Generazione in corso (' + elapsed + 's)... attendere qualche secondo', false);
+  }, 1000);
+
+  try {
+    const resp = await fetch('/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
+
+    if (!resp.ok) {
+      let message = 'Richiesta fallita (' + resp.status + ').';
+      try {
+        const data = await resp.json();
+        if (data && data.error) message = data.error;
+      } catch (e) { /* risposta non JSON, uso il messaggio generico */ }
+      setStatus(message, true);
+      return;
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'report.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus('Report scaricato.', false);
+  } catch (e) {
+    setStatus('Errore di rete: ' + e.message, true);
+  } finally {
+    clearInterval(timer);
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

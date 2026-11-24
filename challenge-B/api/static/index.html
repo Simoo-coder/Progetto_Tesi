@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Octopus Helpdesk</title>
+<style>
+  :root {
+    --bg: #fdf7f7;
+    --panel: #ffffff;
+    --text: #2a181c;
+    --muted: #7a5c63;
+    --accent: #d44d63;
+    --accent-dark: #b5384d;
+    --border: #f0d8dc;
+    --error-bg: #fee2e2;
+    --error-text: #881313;
+    --bubble-user: #fce7eb;
+    --bubble-bot: #f5eff0;
+    --info-bg: #fff6f8;
+    --warn-bg: #fef3c7;
+    --warn-text: #92400e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171012;
+      --panel: #22171a;
+      --text: #f7eaed;
+      --muted: #b0949a;
+      --accent: #d44d63;
+      --accent-dark: #b5384d;
+      --border: #3d282e;
+      --error-bg: #3b1418;
+      --error-text: #fca5a5;
+      --bubble-user: #471c25;
+      --bubble-bot: #2b1d21;
+      --info-bg: #1f1417;
+      --warn-bg: #3b2a0e;
+      --warn-text: #fcd34d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  main { width: 100%; max-width: 680px; }
+  h1 { color: var(--accent); margin-bottom: 4px; }
+  p.subtitle { color: var(--muted); margin-top: 0; margin-bottom: 20px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 4px 12px rgba(212, 77, 99, 0.08);
+  }
+  #reset-banner {
+    display: none;
+    background: var(--warn-bg);
+    color: var(--warn-text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 14px;
+    border: 1px solid rgba(217, 119, 6, 0.25);
+  }
+  #log {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 420px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+    padding-right: 4px;
+  }
+  .msg {
+    padding: 10px 14px;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    max-width: 90%;
+    line-height: 1.4;
+  }
+  .msg.user { 
+    align-self: flex-end; 
+    background: var(--bubble-user); 
+    border-bottom-right-radius: 2px;
+  }
+  .msg.bot { 
+    align-self: flex-start; 
+    background: var(--bubble-bot); 
+    border-bottom-left-radius: 2px;
+  }
+  .msg.error { 
+    align-self: flex-start; 
+    background: var(--error-bg); 
+    color: var(--error-text); 
+  }
+  form { display: flex; gap: 8px; }
+  textarea {
+    flex: 1;
+    min-height: 56px;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(212, 77, 99, 0.2);
+  }
+  button.primary {
+    padding: 0 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+  }
+  button.primary:hover { background: var(--accent-dark); }
+  button.primary:active { transform: scale(0.98); }
+  button.primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .info-box {
+    margin-top: 20px;
+    background: var(--info-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .info-box h2 { font-size: 14px; margin: 0 0 8px; color: var(--accent); }
+  .info-box ul { margin: 6px 0 10px; padding-left: 18px; }
+  .info-box code {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .info-box .example {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-style: italic;
+  }
+
+  footer { margin-top: 20px; font-size: 12px; color: var(--muted); }
+  footer code {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 2px 5px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>🐙 Octopus Helpdesk</h1>
+  <p class="subtitle">Assistente per apertura e consultazione <b>ticket</b> di assistenza IT.</p>
+
+  <div class="panel">
+    <div id="reset-banner"></div>
+    <div id="log"></div>
+    <form id="chat-form">
+      <textarea id="message" placeholder="Scrivi qui la tua richiesta..."></textarea>
+      <button class="primary" type="submit">Invia</button>
+    </form>
+  </div>
+
+  <div class="info-box">
+    <h2>Come funziona un ticket</h2>
+    <p>Un ticket ha tre informazioni: un <strong>oggetto</strong> breve, una
+    <strong>descrizione</strong> del problema e, facoltativamente, il
+    <strong>percorso di un allegato</strong> gia' presente sul sistema.</p>
+    <ul>
+      <li>Per crearne uno, chiedi all'assistente di aprire un ticket
+      indicando oggetto e descrizione (ed eventualmente l'allegato).</li>
+      <li>Per consultarne uno gia' aperto, chiedi di mostrarti il ticket
+      indicandone il numero.</li>
+    </ul>
+    <div class="example">
+      All'interno della cartella /uploads puoi allegare i file:
+      <ul>
+        <li>log_rete.txt</li>
+        <li>richiesta_reset_password.txt</li>
+        <li>ticket_stampante.txt</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    L'API e' raggiungibile anche direttamente: <code>POST /chat</code> con
+    corpo <code>{"message": "..."}</code>, risposta JSON
+    <code>{"reply": "..."}</code>.
+  </footer>
+</main>
+
+<script>
+const log = document.getElementById('log');
+const resetBanner = document.getElementById('reset-banner');
+
+function addMessage(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+const form = document.getElementById('chat-form');
+const textarea = document.getElementById('message');
+const sendBtn = form.querySelector('button');
+
+form.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const message = textarea.value.trim();
+  if (!message) return;
+
+  addMessage(message, 'user');
+  textarea.value = '';
+  sendBtn.disabled = true;
+  const pending = addMessage('L\'assistente sta elaborando...', 'bot');
+
+  try {
+    const resp = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: message })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      pending.className = 'msg error';
+      pending.textContent = data.error || ('Richiesta fallita (' + resp.status + ').');
+      return;
+    }
+
+    pending.textContent = data.reply || '(nessuna risposta)';
+  } catch (e) {
+    pending.className = 'msg error';
+    pending.textContent = 'Errore di rete: ' + e.message;
+  } finally {
+    sendBtn.disabled = false;
+  }
+});
+
+// --- Avviso di reset imminente dei ticket ---
+async function checkResetBanner() {
+  try {
+    const resp = await fetch('/reset-info');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const remaining = data.next_reset_in_s;
+    if (remaining !== undefined && remaining <= 120) {
+      const minutes = Math.max(0, Math.round(remaining / 60));
+      resetBanner.textContent =
+        'Attenzione: i ticket creati finora verranno azzerati tra circa ' +
+        (minutes <= 1 ? 'un minuto' : minutes + ' minuti') + '.';
+      resetBanner.style.display = 'block';
+    } else {
+      resetBanner.style.display = 'none';
+    }
+  } catch (e) {
+    // Se l'endpoint non e' disponibile, semplicemente non mostro l'avviso.
+  }
+}
+
+checkResetBanner();
+setInterval(checkResetBanner, 30000);
+</script>
+</body>
+</html>
