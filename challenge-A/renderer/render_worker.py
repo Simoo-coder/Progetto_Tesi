@@ -1,6 +1,10 @@
+
 import json
+import os
 import re
 import sys
+import time
+import base64
 
 import markdown as md_lib
 import weasyprint
@@ -9,9 +13,11 @@ from markdown.extensions import Extension
 
 env = Environment()
 
+
 class _AsteriskOnlyEmphasis(Extension):
 
-    # impedisce che il carattere underscore (_) venga interpretato come corsivo o grassetto
+    # Impedisce che il carattere underscore (_) venga interpretato
+    # come corsivo o grassetto.
     def extendMarkdown(self, md):
         try:
             proc = md.inlinePatterns["em_strong"]
@@ -29,6 +35,36 @@ class _AsteriskOnlyEmphasis(Extension):
 _MD = md_lib.Markdown(extensions=[_AsteriskOnlyEmphasis()])
 
 BUILD_ID = "REP-2024-1187"
+OUTPUT_PATH = "/tmp/report.pdf"
+
+def restricted_url_fetcher(url):
+    # Blocca file e risorse di rete
+    if not url.startswith("data:"):
+        raise ValueError("Caricamento risorsa non consentito.")
+
+    header, separator, data = url.partition(",")
+
+    if not separator:
+        raise ValueError("Data URL non valido.")
+
+    if len(url) > 2 * 1024 * 1024:
+        raise ValueError("Data URL troppo grande.")
+
+    is_base64 = header.endswith(";base64")
+
+    if is_base64:
+        content = base64.b64decode(data, validate=True)
+    else:
+        from urllib.parse import unquote_to_bytes
+        content = unquote_to_bytes(data)
+
+    mime_type = header[5:].split(";")[0] or "text/plain"
+
+    return {
+        "string": content,
+        "mime_type": mime_type,
+        "redirected_url": url,
+    }
 
 TEMPLATE_HEAD = """<html><head><meta charset="utf-8"><style>
 body { font-family: sans-serif; margin: 40px; color: #222; }
@@ -50,31 +86,62 @@ def render(markdown_text: str) -> bytes:
     _MD.reset()
     body_html = _MD.convert(markdown_text or "")
 
+    # il contenuto Markdown viene concatenato alla sorgente Jinja2 (Vulnerabilità)
     full_template_source = TEMPLATE_HEAD + body_html + TEMPLATE_TAIL
 
     template = env.from_string(full_template_source)
     rendered_html = template.render(build_id=BUILD_ID)
 
-    return weasyprint.HTML(string=rendered_html).write_pdf()
+    pdf_bytes = weasyprint.HTML(
+        string=rendered_html,
+        url_fetcher=restricted_url_fetcher
+    ).write_pdf()
+
+    temp_path = OUTPUT_PATH + ".tmp"
+
+    with open(temp_path, "wb") as f:
+        f.write(pdf_bytes)
+        f.flush()
+        os.fsync(f.fileno())
+
+    os.replace(temp_path, OUTPUT_PATH)
+
+    return pdf_bytes
 
 
 def main():
-    raw = sys.stdin.read()
+    if len(sys.argv) > 1:
+        try:
+            raw = base64.b64decode(sys.argv[1], validate=True).decode("utf-8")
+        except Exception as e:
+            sys.stderr.write(f"Input Base64 non valido: {e}\n")
+            sys.exit(1)
+    else:
+        raw = sys.stdin.read()
+
     try:
         req = json.loads(raw)
         markdown_text = req.get("markdown", "")
-    except json.JSONDecodeError as e:
+
+        if not isinstance(markdown_text, str):
+            raise ValueError("Il campo markdown deve essere una stringa.")
+
+    except (json.JSONDecodeError, AttributeError, ValueError) as e:
         sys.stderr.write(f"Richiesta non valida: {e}\n")
         sys.exit(1)
 
     try:
-        pdf_bytes = render(markdown_text)
+        render(markdown_text)
+
+
+        time.sleep(60)
+
     except Exception as e:
-        sys.stderr.write(f"Errore durante il rendering: {type(e).__name__}: {e}\n")
+        sys.stderr.write(
+            f"Errore durante il rendering: {type(e).__name__}: {e}\n"
+        )
         sys.exit(1)
 
-    sys.stdout.buffer.write(pdf_bytes)
-    sys.stdout.buffer.flush()
     sys.exit(0)
 
 

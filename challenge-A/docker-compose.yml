@@ -1,68 +1,74 @@
 services:
+
   llm:
     image: ghcr.io/ggml-org/llama.cpp:server
     volumes:
       - ./models:/models:ro
     command: >
       -m /models/${MODEL:-Qwen3-4B-Instruct-2507-Q4_K_M.gguf}
-      --host 0.0.0.0 --port 8080
-      -c 4096 --parallel 2 -t 4
+      --host 0.0.0.0
+      --port 8080
+      -c 4096
+      --parallel 2
+      -t 4
       --jinja
     networks:
       - internal
-    deploy:
-      resources:
-        limits:
-          memory: 6g
+    mem_limit: 6g
+    cpus: 4
     restart: unless-stopped
-    # Nessuna porta esposta all'host: raggiungibile solo da 'api' sulla rete interna.
 
-  renderer:
-    build: ./renderer
+  renderer-image:
+    image: mind-renderer:local
+    build:
+      context: ./renderer
+    profiles:
+      - build-only
+
+  supervisor:
+    image: mind-supervisor:local
+    build:
+      context: ./supervisor
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      # Lasciare a 0 durante la gara: se attivato, logga nei log del
-      # container il sorgente del template quando il parsing Jinja2
-      # fallisce (utile solo in sviluppo).
-      - DEBUG_TEMPLATE_SOURCE=0
-      # Tempo massimo (secondi) concesso a un singolo render prima di
-      # essere interrotto forzatamente. Vedi render_worker.py: protegge da
-      # un payload SSTI che causi un ciclo infinito o un render
-      # eccessivamente pesante, che altrimenti bloccherebbe il servizio
-      # per tutti.
-      - RENDER_TIMEOUT_S=20
+      RENDER_TIMEOUT_S: "20"
+      SUPERVISOR_TOKEN: ${SUPERVISOR_TOKEN:?SUPERVISOR_TOKEN non configurato nel file .env}
     networks:
       - internal
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
     restart: unless-stopped
-    # Nessuna porta esposta all'host: raggiungibile solo da 'api'.
+    security_opt:
+      - no-new-privileges:true
 
   api:
-    build: ./api
+    build:
+      context: ./api
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      - LLM_URL=http://llm:8080
-      - RENDERER_URL=http://renderer:9000
-      # Rate limit minimo per IP: una richiesta alla volta, e al massimo
-      # RATE_LIMIT_MAX_REQUESTS ogni RATE_LIMIT_WINDOW_S secondi.
-      - RATE_LIMIT_WINDOW_S=60
-      - RATE_LIMIT_MAX_REQUESTS=10
-      # Lunghezza massima della risposta del modello: vedi README/WRITEUP
-      # per il compromesso velocita'/completezza del report.
-      - MAX_REPORT_TOKENS=90
+      LLM_URL: http://llm:8080
+      RENDERER_URL: http://supervisor:9000
+      SUPERVISOR_TOKEN: ${SUPERVISOR_TOKEN:?SUPERVISOR_TOKEN non configurato nel file .env}
+      RATE_LIMIT_WINDOW_S: "60"
+      RATE_LIMIT_MAX_REQUESTS: "10"
+      MAX_REPORT_TOKENS: "90"
     depends_on:
       - llm
-      - renderer
+      - supervisor
     networks:
       - internal
-    deploy:
-      resources:
-        limits:
-          memory: 256m
+      - frontend
+    mem_limit: 256m
+    cpus: 1
+    pids_limit: 128
     restart: unless-stopped
 
 networks:
   internal:
+    driver: bridge
+    internal: true
+  frontend:
+    driver: bridge

@@ -1,76 +1,112 @@
-# Challenge A - Mind Reports
+# Challenge A – Mind Reports
 
-**Categoria OWASP Top 10 for LLM Applications (2025):**
-**LLM05:2025 - Improper Output Handling**
+**Categoria:** OWASP Top 10 for LLM Applications (2025)  
+**Vulnerabilità:** LLM05:2025 – Improper Output Handling
 
 ## Scenario
 
-"Mind Reports" e' un servizio interno che genera brevi note aziendali:
-descrivi in linguaggio naturale cosa vuoi, un assistente basato su LLM
-scrive il contenuto in Markdown (volutamente breve: poche righe), e un
-secondo servizio lo converte in PDF che puoi scaricare.
+Mind Reports è un servizio interno che genera brevi note aziendali.
 
-Dato il prompt, la risposta e' un PDF (`Content-Type: application/pdf`).
+L'utente descrive in linguaggio naturale il contenuto desiderato. Un assistente basato su un Large Language Model (LLM) genera un testo in Markdown, che viene successivamente convertito in un documento PDF scaricabile.
+
+Il servizio restituisce il risultato con:
+
+```http
+Content-Type: application/pdf
+```
 
 ## Architettura
 
+Il sistema è composto da quattro componenti principali:
+
+```text
+                         giocatore
+                             |
+                             v
+                       API FastAPI
+                    (filtro + rate limit)
+                             |
+                 +-----------+-----------+
+                 |                       |
+                 v                       v
+             LLM Qwen3                Supervisor
+                 |                       |
+                 |                       v
+                 |                Docker renderer
+                 |                (container temporaneo)
+                 |                       |
+                 +------ Markdown ------+
+                                         |
+                                         v
+                                  Jinja2 + WeasyPrint
+                                         |
+                                         v
+                                      PDF
 ```
-giocatore -> api (filtro input + rate limit) -> llm (Qwen3 4B, llama.cpp)
-                      |
-                      v
-                 Markdown generato dal modello
-                      |
-                      v
-                 renderer (Jinja2 + WeasyPrint)  <-- flag qui
-                      |
-                      v
-                    PDF
-```
 
-- `api`: applica il filtro di input (`api/filter.py`) e un rate limit minimo
-  per IP, interroga il modello, passa il Markdown al renderer, restituisce il
-  PDF.
-- `renderer`: converte il Markdown in PDF
+### Componenti
 
-## La vulnerabilita'
+- **API:** riceve le richieste degli utenti, applica il filtro di input e il rate limiting, interroga il modello e inoltra il Markdown generato al Supervisor.
+- **LLM:** utilizza Qwen3 4B tramite llama.cpp per generare il contenuto del report.
+- **Supervisor:** gestisce le richieste di rendering e avvia container Docker temporanei dedicati alla conversione dei documenti.
+- **Renderer:** converte il Markdown in HTML e successivamente in PDF tramite Jinja2 e WeasyPrint.
 
-`renderer/main.py` concatena l'HTML derivato dal Markdown del modello
-**direttamente nella sorgente** del template Jinja2, prima di compilarla con
-`Environment.from_string()`:
+Il renderer viene eseguito in un container isolato, senza accesso alla rete e con privilegi ridotti. Al termine del rendering, il PDF viene recuperato dal Supervisor e il container temporaneo viene eliminato.
 
-```python
+## La vulnerabilità
+
+La vulnerabilità si trova nel processo di generazione del documento, all'interno del renderer.
+
+Il codice converte il Markdown in HTML e concatena il risultato direttamente alla sorgente di un template Jinja2:
+
+'''
+python
 body_html = _MD.convert(req.markdown or "")
-full_template_source = TEMPLATE_HEAD + body_html + TEMPLATE_TAIL
-template = env.from_string(full_template_source)   # <-- qui l'errore
-rendered_html = template.render(build_id=BUILD_ID)
-```
 
-Jinja2 non distingue "dati" da "codice di template": qualunque sintassi
-`{{ ... }}` o `{% ... %}` presente nel testo del report viene **eseguita**
-come espressione Jinja2, con gli stessi privilegi del processo del renderer.
-Il modo corretto sarebbe passare il contenuto come variabile
-(`template.render(content=markdown_content)`), mai come parte della sorgente
-del template.
+full_template_source = (
+    TEMPLATE_HEAD + body_html + TEMPLATE_TAIL
+)
 
-Questo e' un caso di *Improper Output Handling*: un componente a valle
-(il renderer) tratta l'output del modello, in ultima analisi influenzabile
-dall'utente, come se fosse codice fidato.
+template = env.from_string(full_template_source) <- # qui c'è la vulnerabilità
+
+rendered_html = template.render(
+    build_id=BUILD_ID
+)
+'''
+
+Eventuali espressioni o istruzioni Jinja2 presenti nel contenuto HTML generato dal Markdown possono essere interpretate ed eseguite durante il rendering.
+
+Questo comportamento costituisce una vulnerabilità di **Server-Side Template Injection (SSTI)**.
+
+### Perché è una vulnerabilità LLM05?
+
+Il problema rientra nella categoria OWASP LLM05:2025 – Improper Output Handling.
+L'output generato dal modello viene utilizzato da un componente a valle senza un'adeguata separazione tra dati e codice.
+Anche se il modello produce Markdown e non codice Python, il contenuto può raggiungere un motore di template che lo interpreta come istruzioni.
+Il problema non dipende esclusivamente dal comportamento del modello: un utente può influenzare indirettamente l'output attraverso il prompt inviato all'LLM.
 
 ## Indizio lasciato ai giocatori
 
-Ogni PDF prodotto include in fondo:
+Ogni PDF prodotto include un footer simile al seguente:
 
-```
-Generated by ReportEngine v1.0 -- build {{ build_id }}
+```text
+Generated by ReportEngine v1.0 -- build REP-2024-1187
 ```
 
-`build_id` viene sostituito con un valore reale (`REP-2024-1187`): questo
-rivela che il contenuto passa per un secondo motore di template lato server
-*e* che la sintassi `{{ }}` al suo interno viene davvero valutata (altrimenti
-il footer mostrerebbe `{{ build_id }}` letteralmente, non il suo valore).
+Il valore `REP-2024-1187` corrisponde alla variabile `build_id`, passata al template durante il rendering:
 
-## Soluzione
+```python
+rendered_html = template.render(
+    build_id=BUILD_ID
+)
+```
 
-```
-{{ cycler.__init__.__globals__.os.popen('cat /flag.txt').read() }}
-```
+Questo dettaglio costituisce un indizio importante.
+Dimostra che il documento passa attraverso un motore di template lato server e che le variabili Jinja2 vengono effettivamente valutate.
+Il giocatore deve quindi indagare su come il contenuto generato dall'LLM viene passato al renderer e su come viene interpretato da Jinja2.
+
+**## Soluzione**
+
+\`\`\`
+{{ cycler.\_\_init\_\_.\_\_globals\_\_.os.popen('cat /flag.txt').read() }}
+\`\`\`

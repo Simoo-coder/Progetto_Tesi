@@ -24,6 +24,12 @@ MAX_REPORT_TOKENS = int(os.environ.get("MAX_REPORT_TOKENS", "90"))
 RATE_LIMIT_WINDOW_S = int(os.environ.get("RATE_LIMIT_WINDOW_S", "60"))
 RATE_LIMIT_MAX_REQUESTS = int(os.environ.get("RATE_LIMIT_MAX_REQUESTS", "10"))
 
+SUPERVISOR_TOKEN = os.environ["SUPERVISOR_TOKEN"]
+
+if len(SUPERVISOR_TOKEN) < 32:
+    raise RuntimeError("SUPERVISOR_TOKEN deve contenere almeno 32 caratteri.")
+
+
 _in_flight: set[str] = set()
 _request_times: dict[str, deque] = defaultdict(deque)
 
@@ -107,6 +113,9 @@ async def generate_report(req: ReportRequest, request: Request):
                 )
                 llm_resp.raise_for_status()
                 markdown_content = llm_resp.json()["choices"][0]["message"]["content"]
+                print("=== MARKDOWN GENERATO DAL MODELLO ===")
+                print(repr(markdown_content))
+                print("=== FINE MARKDOWN ===")
             except httpx.HTTPError as e:
                 return JSONResponse(status_code=502, content={"error": f"Errore dal modello: {e}"})
 
@@ -114,6 +123,9 @@ async def generate_report(req: ReportRequest, request: Request):
                 pdf_resp = await client.post(
                     f"{RENDERER_URL}/render",
                     json={"markdown": markdown_content},
+                    headers={
+                        "Authorization": f"Bearer {SUPERVISOR_TOKEN}"
+                    },
                 )
                 pdf_resp.raise_for_status()
             except httpx.HTTPError as e:
